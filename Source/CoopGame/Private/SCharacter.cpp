@@ -2,9 +2,13 @@
 
 #include "SCharacter.h"
 #include "SWeapon.h"
+#include "CoopGame.h"
+#include "SHealthComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "Net/UnrealNetwork.h"
 
 // Sets default values
 ASCharacter::ASCharacter()
@@ -17,6 +21,10 @@ ASCharacter::ASCharacter()
 	SpringArmComp->SetupAttachment(RootComponent);
 
 	GetMovementComponent()->GetNavAgentPropertiesRef().bCanCrouch = true;
+
+	GetCapsuleComponent()->SetCollisionResponseToChannel(COLLISION_WEAPON, ECR_Ignore);
+
+	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
 
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp"));
 	CameraComp->SetupAttachment(SpringArmComp);
@@ -33,17 +41,21 @@ void ASCharacter::BeginPlay()
 	Super::BeginPlay();
 	
 	DefaultFOV = CameraComp->FieldOfView;
+	HealthComp->OnHealthChanged.AddDynamic(this, &ASCharacter::OnHealthChanged);
 
-	// Spawn default weapon
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	CurrentWeapon = GetWorld()->SpawnActor<ASWeapon>(StarterWeaponClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-	if (CurrentWeapon)
+	if (Role == ROLE_Authority)
 	{
-		CurrentWeapon->SetOwner(this);
-		CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponAttachSocketName);
-	}
+		// Spawn default weapon
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		CurrentWeapon = GetWorld()->SpawnActor<ASWeapon>(StarterWeaponClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		if (CurrentWeapon)
+		{
+			CurrentWeapon->SetOwner(this);
+			CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponAttachSocketName);
+		}
+	}	
 }
 
 // Called to bind functionality to input
@@ -65,6 +77,7 @@ void ASCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 	PlayerInputComponent->BindAction("Zoom", IE_Released, this, &ASCharacter::EndZoom);
 
 	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &ASCharacter::StartFire);
+	PlayerInputComponent->BindAction("Fire", IE_Released, this, &ASCharacter::StopFire);
 }
 
 FVector ASCharacter::GetPawnViewLocation() const
@@ -111,7 +124,32 @@ void ASCharacter::StartFire()
 {
 	if (CurrentWeapon)
 	{
-		CurrentWeapon->Fire();
+		CurrentWeapon->StartFire();
+	}
+}
+
+void ASCharacter::StopFire()
+{
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->StopFire();
+	}
+}
+
+void ASCharacter::OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType,
+								  class AController* InstigatedBy, AActor* DamageCauser)
+{
+	if (Health <= 0.0f && !bDied)
+	{
+		// Die
+		bDied = true;
+
+		GetMovementComponent()->StopMovementImmediately();
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		DetachFromControllerPendingDestroy();
+
+		SetLifeSpan(10.0f);
 	}
 }
 
@@ -126,4 +164,10 @@ void ASCharacter::Tick(float DeltaTime)
 	CameraComp->SetFieldOfView(NewFOV);
 }
 
+void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
+	DOREPLIFETIME(ASCharacter, CurrentWeapon);
+	DOREPLIFETIME(ASCharacter, bDied);
+}

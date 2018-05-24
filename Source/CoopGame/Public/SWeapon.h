@@ -10,6 +10,21 @@ class USkeletalMeshComponent;
 class DamageType;
 class UParticleSystem;
 
+// Contains information of a single hitscan weapon line trace
+USTRUCT()
+struct FHitScanTrace
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY()
+	TEnumAsByte<EPhysicalSurface> SurfaceType;
+
+	UPROPERTY()
+	FVector_NetQuantize TraceTo;
+};
+
 UCLASS()
 class COOPGAME_API ASWeapon : public AActor
 {
@@ -21,10 +36,14 @@ public:
 
 protected:
 
+	virtual void BeginPlay() override;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Component")
 	USkeletalMeshComponent* MeshComp;	
 
 	void PlayFireEffect(FVector TraceEnd);
+
+	void PlayImpactEffect(EPhysicalSurface SurfaceType, FVector ImpactPoint);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<UDamageType> DamageType;
@@ -39,7 +58,10 @@ protected:
 	UParticleSystem* MuzzleEffect;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
-	UParticleSystem* ImpactEffect;
+	UParticleSystem* DefaultImpactEffect;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	UParticleSystem* FleshImpactEffect;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	UParticleSystem* TracerEffect;
@@ -47,9 +69,34 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	TSubclassOf<UCameraShake> FireCamShake;
 
-public:	
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	float BaseDamage;
 
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	virtual void Fire();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerFire();
+
+	FTimerHandle TimerHandle_TimerBetweenShots;
+
+	float LastFireTime;
+
+	// RPM - Bullet per minute fire by weapon
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	float RateOfFire;
+
+	float TimeBetweenShots;
+
+	UPROPERTY(ReplicatedUsing=OnRep_HitScanTrace)
+	FHitScanTrace HitScanTrace;
+
+	UFUNCTION()
+	void OnRep_HitScanTrace();
+
+public:
+
+	void StartFire();
+
+	void StopFire();
 	
 };
