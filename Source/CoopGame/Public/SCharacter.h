@@ -58,10 +58,6 @@ protected:
 	UPROPERTY(Replicated)
 	ASWeapon* CurrentWeapon;
 
-	void StartFire();
-
-	void StopFire();
-
 	UFUNCTION()
 	void OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType,
 						 class AController* InstigatedBy, AActor* DamageCauser);
@@ -83,6 +79,11 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	virtual FVector GetPawnViewLocation() const override;
-	
+	virtual FVector GetPawnViewLocation() const override;	
+
+	UFUNCTION(BlueprintCallable, Category = "Player")
+	void StartFire();
+
+	UFUNCTION(BlueprintCallable, Category = "Player")
+	void StopFire();
 };
