@@ -85,6 +85,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	float RateOfFire;
 
+	/* Bullet spread in degrees */
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon", meta = (ClampMin=0.0f))
+	float BulletSpread;
+
 	float TimeBetweenShots;
 
 	UPROPERTY(ReplicatedUsing=OnRep_HitScanTrace)

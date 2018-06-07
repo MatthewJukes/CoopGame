@@ -72,7 +72,11 @@ protected:
 
 	FTimerHandle TimerHandle_SelfDamage;
 
+	FTimerHandle TimerHandle_RefreshPath;
+
 	void DamageSelf();
+
+	void RefreshPath();
 
 	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
 	USoundCue* SelfDestructSound;
